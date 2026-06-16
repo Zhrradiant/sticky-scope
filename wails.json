@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "sticky-scope",
+  "outputfilename": "Sticky Scope",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Zhrradiant LemonTea",
+    "email": "zhrradiant@qq.com"
+  },
+  "info": {
+    "companyName": "Zhrradiant",
+    "productName": "Sticky Scope",
+    "productVersion": "1.0.1",
+    "copyright": "Copyright © 2026 Zhrradiant",
+    "comments": "SS - Sticky Scope"
+  }
+}
