@@ -4,7 +4,7 @@
 
 # Sticky Scope
 
-**A frameless, always-on-top desktop sticky note that tracks what changed in any folder — no Git required.**
+**An always-on-top desktop sticky note that tracks what changed in any folder — no Git required.**
 
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev) [![Wails](https://img.shields.io/badge/Wails-v2.12-DF0000?logo=wails&logoColor=white)](https://wails.io) [![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs&logoColor=white)](https://vuejs.org) [![Platform](https://img.shields.io/badge/Windows-10%2F11-0078D6?logo=windows&logoColor=white)](#prerequisites) [![Version](https://img.shields.io/badge/version-1.0.1-333333)]()
 

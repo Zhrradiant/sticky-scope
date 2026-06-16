@@ -4,7 +4,7 @@
 
 # Sticky Scope
 
-**一个常驻桌面、无边框、始终置顶的便签,实时告诉你任意文件夹里改了什么 —— 无需 Git。**
+**一个常驻桌面、始终置顶的便签,实时告诉你任意文件夹里改了什么 —— 无需 Git。**
 
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev) [![Wails](https://img.shields.io/badge/Wails-v2.12-DF0000?logo=wails&logoColor=white)](https://wails.io) [![Vue](https://img.shields.io/badge/Vue-3-4FC08D?logo=vuedotjs&logoColor=white)](https://vuejs.org) [![Platform](https://img.shields.io/badge/Windows-10%2F11-0078D6?logo=windows&logoColor=white)](#环境要求) [![Version](https://img.shields.io/badge/version-1.0.1-333333)]()
 
