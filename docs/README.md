@@ -163,3 +163,7 @@ sticky-scope/
 
 > [!TIP]
 > The TypeScript types under `frontend/wailsjs/` are **generated** from the Go `model` package and `app.go` — re-run `wails dev`/`wails build` after changing bound methods or DTOs rather than editing them by hand.
+
+## Acknowledgments
+
+This project includes code from the following open-source libraries: Wails, go-udiff, fsnotify, go-git, google/uuid, Vue 3, Pinia, vue-i18n.

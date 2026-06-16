@@ -165,3 +165,7 @@ sticky-scope/
 
 > [!TIP]
 > `frontend/wailsjs/` 下的 TypeScript 类型是从 Go 的 `model` 包和 `app.go` **生成**的 —— 改动绑定方法或 DTO 后请重新运行 `wails dev`/`wails build`,而不要手工编辑它们。
+
+## 致谢
+
+本项目使用了以下开源库：Wails、go-udiff、fsnotify、go-git、google/uuid、Vue 3、Pinia、vue-i18n。
