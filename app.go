@@ -159,6 +159,20 @@ func (a *App) SetCompactMode(expand bool) {
 	}
 }
 
+// SetCollapsedMode locks the window to a minimal tray size (header + footer only)
+// or unlocks it so the normal compact/expanded sizing takes over again.
+func (a *App) SetCollapsedMode(collapse bool) {
+	if collapse {
+		runtime.WindowSetMinSize(a.ctx, 183, 78)
+		runtime.WindowSetMaxSize(a.ctx, 183, 78)
+		runtime.WindowSetSize(a.ctx, 183, 78)
+	} else {
+		// Remove the max-size clamp so resize is allowed again.
+		// A zero max means "no constraint" in Wails/WebView2.
+		runtime.WindowSetMaxSize(a.ctx, 0, 0)
+	}
+}
+
 // StickyProjectID returns the project ID that was preloaded via --project-path,
 // or an empty string when this is the main (non-sticky) process. The frontend
 // uses this to select the correct project on startup instead of defaulting to

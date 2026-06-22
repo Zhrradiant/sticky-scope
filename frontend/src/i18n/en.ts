@@ -16,6 +16,8 @@ export default {
     confirm: 'Sync',
     expand: 'Expand',
     collapse: 'Collapse',
+    collapseToTray: 'Enter collapsed mode',
+    expandFromTray: 'Exit collapsed mode',
     pinSticky: 'Pin as new note',
     deepRescan: 'Deep rescan (clear cache and rescan all files)',
     settings: 'Tool settings',

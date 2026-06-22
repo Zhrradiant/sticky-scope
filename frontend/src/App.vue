@@ -8,6 +8,7 @@ import { useWailsEvents } from '@/composables/useWailsEvents'
 import StickyHeader from '@/components/StickyHeader.vue'
 import CompactView from '@/components/CompactView.vue'
 import ExpandedView from '@/components/ExpandedView.vue'
+import CollapsedView from '@/components/CollapsedView.vue'
 import EmptyGuide from '@/components/EmptyGuide.vue'
 import { App } from '@/api'
 
@@ -15,7 +16,7 @@ const projects = useProjectsStore()
 const changes = useChangesStore()
 const ui = useUiStore()
 const { active } = storeToRefs(projects)
-const { isExpanded } = storeToRefs(ui)
+const { isExpanded, isCollapsed } = storeToRefs(ui)
 
 useWailsEvents()
 
@@ -49,6 +50,9 @@ function onFileSelect(_path: string) {
 
     <!-- No project: show guide -->
     <EmptyGuide v-if="!active" />
+
+    <!-- Collapsed tray mode: header + footer only -->
+    <CollapsedView v-else-if="isCollapsed" />
 
     <!-- Has project, compact mode -->
     <CompactView v-else-if="!isExpanded" @select="onFileSelect" />

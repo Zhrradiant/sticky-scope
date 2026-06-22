@@ -16,6 +16,8 @@ export default {
     confirm: '同步',
     expand: '展开',
     collapse: '收起',
+    collapseToTray: '进入收纳模式',
+    expandFromTray: '退出收纳模式',
     pinSticky: '钉出独立便签',
     deepRescan: '深度重扫（清缓存后重新扫描所有文件）',
     settings: '工具设置',

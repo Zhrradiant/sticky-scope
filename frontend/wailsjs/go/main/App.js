@@ -34,6 +34,10 @@ export function SelectDirectory() {
   return window['go']['main']['App']['SelectDirectory']();
 }
 
+export function SetCollapsedMode(arg1) {
+  return window['go']['main']['App']['SetCollapsedMode'](arg1);
+}
+
 export function SetCompactMode(arg1) {
   return window['go']['main']['App']['SetCompactMode'](arg1);
 }

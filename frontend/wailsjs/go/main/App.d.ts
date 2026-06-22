@@ -18,6 +18,8 @@ export function RemoveProject(arg1:string):Promise<void>;
 
 export function SelectDirectory():Promise<string>;
 
+export function SetCollapsedMode(arg1:boolean):Promise<void>;
+
 export function SetCompactMode(arg1:boolean):Promise<void>;
 
 export function SpawnStickyNote(arg1:string):Promise<void>;

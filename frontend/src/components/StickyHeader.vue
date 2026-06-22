@@ -9,12 +9,14 @@ import { WindowMinimise, Quit } from '../../wailsjs/runtime/runtime'
 import ConfirmDialog from './ConfirmDialog.vue'
 import { currentLocale, setLocale, i18n } from '@/i18n'
 import type { Lang } from '@/types'
+import compressIcon from '@/assets/compress-solid-full.svg'
+import expandIcon from '@/assets/expand-solid-full.svg'
 
 const projects = useProjectsStore()
 const changes = useChangesStore()
 const ui = useUiStore()
 const { projects: list, activeId, addingProject, addProgress } = storeToRefs(projects)
-const { isExpanded } = storeToRefs(ui)
+const { isExpanded, isCollapsed } = storeToRefs(ui)
 const { busy } = storeToRefs(changes)
 
 const active = computed(() => list.value.find((p) => p.id === activeId.value) ?? null)
@@ -67,6 +69,20 @@ function toggleExpand() {
   const expand = !isExpanded.value
   ui.setExpanded(expand)
   App.SetCompactMode(expand)
+}
+
+function toggleCollapsed() {
+  const collapse = !isCollapsed.value
+  // Close any open panels before collapsing — they'd overflow the tiny window.
+  dropdownOpen.value = false
+  settOpen.value = false
+  moreOpen.value = false
+  ui.setCollapsed(collapse)
+  App.SetCollapsedMode(collapse)
+  if (!collapse) {
+    // Exiting collapsed mode: restore previous window size
+    App.SetCompactMode(isExpanded.value)
+  }
 }
 
 async function spawnStickyForProject(projectPath: string) {
@@ -169,65 +185,77 @@ function switchLocale(l: Lang) {
 
 <template>
   <header class="sticky-header drag-region">
-    <!-- Project dropdown -->
-    <div ref="projRef" class="proj-drop no-drag">
-      <button class="proj-btn" @click="toggleDropdown" :disabled="!list.length">
-        <span class="proj-name">{{ projDisplayName }}</span>
-        <span class="arrow">▾</span>
+    <div class="left-group no-drag">
+      <!-- Collapse toggle -->
+      <button
+        v-if="active"
+        class="collapse-btn"
+        @click="toggleCollapsed"
+        :title="isCollapsed ? $t('header.expandFromTray') : $t('header.collapseToTray')"
+      >
+        <img :src="isCollapsed ? compressIcon : expandIcon" class="collapse-icon" alt="" />
       </button>
-      <div v-if="dropdownOpen" class="dropdown-menu">
-        <div class="proj-list-scroll">
-          <div
-            v-for="p in list"
-            :key="p.id"
-            class="dropdown-item proj-row"
-            :class="{ active: p.id === activeId }"
-            @click="selectProject(p.id)"
-          >
-            <span class="dot" :class="p.available ? 'on' : 'bad'"></span>
-            <span class="item-name">{{ p.name }}</span>
-            <button
-              class="share-btn"
-              @click.stop="spawnStickyForProject(p.path)"
-              :title="$t('header.pinSticky')"
-            >↗</button>
-          </div>
-        </div>
-        <div class="dropdown-sep"></div>
-        <div class="dropdown-item" @click="!addingProject && addProject()" :class="{ disabled: addingProject }">
-          <template v-if="addingProject && addProgress">
-            <div class="add-prog">
-              <span class="add-prog-label">{{ $t('header.adding') }}</span>
-              <div class="add-prog-bar">
-                <div class="add-prog-fill" :style="{ width: addProgress.total > 0 ? (addProgress.current / addProgress.total * 100) + '%' : '100%' }"></div>
-              </div>
-              <span class="add-prog-num" v-if="addProgress.total > 0">{{ addProgress.current }}/{{ addProgress.total }}</span>
+
+      <!-- Project dropdown -->
+      <div ref="projRef" class="proj-drop">
+        <button class="proj-btn" @click="isCollapsed ? null : toggleDropdown()" :disabled="!list.length || isCollapsed">
+          <span class="proj-name">{{ projDisplayName }}</span>
+          <span class="arrow">▾</span>
+        </button>
+        <div v-if="dropdownOpen && !isCollapsed" class="dropdown-menu">
+          <div class="proj-list-scroll">
+            <div
+              v-for="p in list"
+              :key="p.id"
+              class="dropdown-item proj-row"
+              :class="{ active: p.id === activeId }"
+              @click="selectProject(p.id)"
+            >
+              <span class="dot" :class="p.available ? 'on' : 'bad'"></span>
+              <span class="item-name">{{ p.name }}</span>
+              <button
+                class="share-btn"
+                @click.stop="spawnStickyForProject(p.path)"
+                :title="$t('header.pinSticky')"
+              >↗</button>
             </div>
-          </template>
-          <template v-else>{{ $t('header.addProject') }}</template>
-        </div>
-        <div class="dropdown-sep" v-if="active"></div>
-        <div v-if="active" class="dropdown-item danger" @click="removeCurrentProject">
-          ✕ {{ $t('header.removeProject') }}
+          </div>
+          <div class="dropdown-sep"></div>
+          <div class="dropdown-item" @click="!addingProject && addProject()" :class="{ disabled: addingProject }">
+            <template v-if="addingProject && addProgress">
+              <div class="add-prog">
+                <span class="add-prog-label">{{ $t('header.adding') }}</span>
+                <div class="add-prog-bar">
+                  <div class="add-prog-fill" :style="{ width: addProgress.total > 0 ? (addProgress.current / addProgress.total * 100) + '%' : '100%' }"></div>
+                </div>
+                <span class="add-prog-num" v-if="addProgress.total > 0">{{ addProgress.current }}/{{ addProgress.total }}</span>
+              </div>
+            </template>
+            <template v-else>{{ $t('header.addProject') }}</template>
+          </div>
+          <div class="dropdown-sep" v-if="active"></div>
+          <div v-if="active" class="dropdown-item danger" @click="removeCurrentProject">
+            ✕ {{ $t('header.removeProject') }}
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Actions -->
     <div class="actions no-drag">
-      <button v-if="isExpanded" class="sm primary confirm-btn" :disabled="busy || !hasChanges" @click="confirm" :title="$t('header.confirmAll')">
+      <button v-if="isExpanded && !isCollapsed" class="sm primary confirm-btn" :disabled="busy || !hasChanges" @click="confirm" :title="$t('header.confirmAll')">
         {{ $t('header.confirm') }}
       </button>
 
       <!-- Expanded mode: individual action buttons -->
-      <template v-if="isExpanded">
+      <template v-if="isExpanded && !isCollapsed">
         <button class="sm ghost expand-btn" @click="toggleExpand" :title="$t('header.collapse')">↙</button>
         <button class="sm ghost icon-btn" :disabled="busy || !active" @click="doDeepRescan" :title="$t('header.deepRescan')">⟳</button>
         <button ref="settBtnRef" class="sm ghost icon-btn" @click.stop="settOpen = !settOpen" :title="$t('header.settings')">⚙</button>
       </template>
 
       <!-- Compact mode: "···" overflow menu -->
-      <div v-else ref="moreRef" class="more-drop no-drag">
+      <div v-else-if="!isCollapsed" ref="moreRef" class="more-drop no-drag">
         <button class="sm ghost icon-btn more-btn" @click="toggleMore" :title="$t('header.more')">···</button>
         <div v-if="moreOpen" class="dropdown-menu more-menu">
           <div class="dropdown-item" @click.stop="onMoreDeepRescan">
@@ -249,8 +277,8 @@ function switchLocale(l: Lang) {
       </div>
 
       <!-- Window controls -->
-      <button class="sm ghost icon-btn" @click="WindowMinimise" :title="$t('header.minimize')">─</button>
-      <button class="sm ghost icon-btn win-close" @click="Quit" :title="$t('header.close')">✕</button>
+      <button v-if="!isCollapsed" class="sm ghost icon-btn" @click="WindowMinimise" :title="$t('header.minimize')">─</button>
+      <button v-if="!isCollapsed" class="sm ghost icon-btn win-close" @click="Quit" :title="$t('header.close')">✕</button>
     </div>
 
     <!-- Settings panel (shared between expanded and compact modes) -->
@@ -316,6 +344,37 @@ function switchLocale(l: Lang) {
   background: var(--bg);
 }
 .proj-drop { position: relative; }
+.left-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transform: translateY(2px);
+}
+.collapse-btn:hover {
+  background: transparent;
+  border-color: transparent;
+}
+.collapse-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.4;
+  transform: scale(0.8);
+  transition: opacity 0.15s, transform 0.15s;
+}
+.collapse-btn:hover .collapse-icon {
+  opacity: 0.7;
+  transform: scale(0.85);
+}
 .proj-btn {
   display: flex; align-items: center; gap: 6px;
   background: transparent; border: 1px solid transparent; border-radius: 10px;
