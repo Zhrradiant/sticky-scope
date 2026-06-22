@@ -36,6 +36,7 @@ export default {
     title: '改动文件',
     empty: '暂无改动',
     binary: '二进制',
+    openLocation: '打开文件位置',
   },
   diff: {
     placeholder: '从左侧选择一个文件查看改动',

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -541,6 +542,56 @@ func (m *Manager) UpdateIgnore(id string, defaultPatterns []string, extraPattern
 	// so the frontend receives an immediate change event.
 	m.rescanAndEmit(mon)
 	return err
+}
+
+// OpenFileLocation opens the system file manager with the given project-relative
+// file selected. On Windows it uses explorer /select; on macOS open -R; on Linux
+// xdg-open on the containing directory.
+func (m *Manager) OpenFileLocation(id, relPath string) error {
+	mon, err := m.getMonitor(id)
+	if err != nil {
+		return err
+	}
+	mon.mu.Lock()
+	root := mon.meta.Path
+	mon.mu.Unlock()
+
+	full := filepath.Join(root, filepath.FromSlash(relPath))
+	if _, err := os.Stat(full); err != nil {
+		// File may be deleted; try the parent directory instead.
+		dir := filepath.Dir(full)
+		if _, err := os.Stat(dir); err != nil {
+			return fmt.Errorf("path not found: %s", full)
+		}
+		return openDir(dir)
+	}
+	return openFileLocation(full)
+}
+
+func openFileLocation(path string) error {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	switch runtime.GOOS {
+	case "windows":
+		return exec.Command("explorer", "/select,", abs).Start()
+	case "darwin":
+		return exec.Command("open", "-R", abs).Start()
+	default:
+		return openDir(filepath.Dir(abs))
+	}
+}
+
+func openDir(dir string) error {
+	switch runtime.GOOS {
+	case "windows":
+		return exec.Command("explorer", dir).Start()
+	case "darwin":
+		return exec.Command("open", dir).Start()
+	default:
+		return exec.Command("xdg-open", dir).Start()
+	}
 }
 
 // Shutdown stops all watchers; called from the Wails OnShutdown hook.

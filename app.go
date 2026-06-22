@@ -197,3 +197,11 @@ func (a *App) SpawnStickyNote(projectPath string) error {
 		"--y="+strconv.Itoa(y+40),
 	).Start()
 }
+
+// OpenFileLocation opens the system file manager with the given file selected.
+func (a *App) OpenFileLocation(id, path string) error {
+	if a.mgr == nil {
+		return errNotReady
+	}
+	return a.mgr.OpenFileLocation(id, path)
+}

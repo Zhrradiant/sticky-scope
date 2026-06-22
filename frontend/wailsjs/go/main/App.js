@@ -26,6 +26,10 @@ export function ListProjects() {
   return window['go']['main']['App']['ListProjects']();
 }
 
+export function OpenFileLocation(arg1, arg2) {
+  return window['go']['main']['App']['OpenFileLocation'](arg1, arg2);
+}
+
 export function RemoveProject(arg1) {
   return window['go']['main']['App']['RemoveProject'](arg1);
 }

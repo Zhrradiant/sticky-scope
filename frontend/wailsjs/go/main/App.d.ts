@@ -14,6 +14,8 @@ export function GetFileDiff(arg1:string,arg2:string):Promise<model.FileDiff>;
 
 export function ListProjects():Promise<Array<model.ProjectInfo>>;
 
+export function OpenFileLocation(arg1:string,arg2:string):Promise<void>;
+
 export function RemoveProject(arg1:string):Promise<void>;
 
 export function SelectDirectory():Promise<string>;

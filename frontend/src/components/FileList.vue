@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useProjectsStore } from '@/stores/projects'
 import { useChangesStore } from '@/stores/changes'
 import { splitPath } from '@/types'
-import { model } from '@/api'
+import { model, OpenFileLocation } from '@/api'
+import { useContextMenu } from '@/composables/useContextMenu'
+import type { ContextMenuItem } from '@/composables/useContextMenu'
+import ContextMenu from '@/components/ContextMenu.vue'
 
 const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
 const emit = defineEmits<{ (e: 'select', path: string): void }>()
 
+const { t } = useI18n()
 const projects = useProjectsStore()
 const changes = useChangesStore()
 const { selectedPath, busy } = storeToRefs(changes)
@@ -16,6 +21,21 @@ const { selectedPath, busy } = storeToRefs(changes)
 const cs = computed<model.ChangeSet | null>(() => changes.changeSetFor(projects.activeId))
 const files = computed(() => cs.value?.files ?? [])
 const hasChanges = computed(() => (cs.value?.totalFiles ?? 0) > 0)
+
+// ---- context menu ----
+const ctx = useContextMenu()
+
+function onContextMenu(e: MouseEvent, filePath: string) {
+  const items: ContextMenuItem[] = [
+    {
+      label: t('files.openLocation'),
+      action: () => {
+        if (projects.activeId) void OpenFileLocation(projects.activeId, filePath)
+      },
+    },
+  ]
+  ctx.openMenu(e, items)
+}
 
 function statusDot(s: string): string {
   if (s === 'added') return '●'
@@ -55,6 +75,7 @@ async function confirmAll() {
         class="item"
         :class="{ active: f.path === selectedPath }"
         @click="pick(f.path)"
+        @contextmenu="onContextMenu($event, f.path)"
       >
         <span class="st" :class="f.status" :title="statusTitle(f.status)">{{ statusDot(f.status) }}</span>
         <span class="path">
@@ -83,6 +104,14 @@ async function confirmAll() {
       <span class="stat-del" v-if="cs?.totalRemoved">-{{ cs.totalRemoved }}</span>
       <span class="info">{{ cs?.totalFiles ?? 0 }} {{ $t('status.files') }}</span>
     </footer>
+
+    <ContextMenu
+      :visible="ctx.visible.value"
+      :x="ctx.x.value"
+      :y="ctx.y.value"
+      :items="ctx.items.value"
+      @close="ctx.closeMenu()"
+    />
   </section>
 </template>
 

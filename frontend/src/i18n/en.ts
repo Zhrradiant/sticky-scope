@@ -36,6 +36,7 @@ export default {
     title: 'Changed files',
     empty: 'No changes',
     binary: 'binary',
+    openLocation: 'Open file location',
   },
   diff: {
     placeholder: 'Select a file on the left to view its changes',
