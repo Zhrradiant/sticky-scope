@@ -21,6 +21,12 @@ const { selectedPath, busy } = storeToRefs(changes)
 const cs = computed<model.ChangeSet | null>(() => changes.changeSetFor(projects.activeId))
 const files = computed(() => cs.value?.files ?? [])
 const hasChanges = computed(() => (cs.value?.totalFiles ?? 0) > 0)
+// "loading" only when this project has never received a ChangeSet yet. If we
+// already have one (e.g. cached from a previous visit) we show it immediately
+// even while a refresh is in flight, instead of flashing a loading state.
+const loading = computed(() =>
+  changes.isLoading(projects.activeId) && !cs.value,
+)
 
 // ---- context menu ----
 const ctx = useContextMenu()
@@ -67,7 +73,8 @@ async function confirmAll() {
     </header>
 
     <div class="scroll">
-      <p v-if="!files.length" class="empty">{{ $t('files.empty') }}</p>
+      <p v-if="loading" class="loading">{{ $t('common.loading') }}</p>
+      <p v-else-if="!files.length" class="empty">{{ $t('files.empty') }}</p>
 
       <div
         v-for="f in files"
@@ -99,10 +106,15 @@ async function confirmAll() {
 
     <!-- Compact footer -->
     <footer v-if="compact" class="mini-footer">
-      <button class="sync-btn" :disabled="busy || !hasChanges" @click="confirmAll" :title="$t('header.confirmAll')">{{ $t('header.confirm') }}</button>
-      <span class="stat-add" v-if="cs?.totalAdded">+{{ cs.totalAdded }}</span>
-      <span class="stat-del" v-if="cs?.totalRemoved">-{{ cs.totalRemoved }}</span>
-      <span class="info">{{ cs?.totalFiles ?? 0 }} {{ $t('status.files') }}</span>
+      <button class="sync-btn" :disabled="busy || loading || !hasChanges" @click="confirmAll" :title="$t('header.confirmAll')">{{ $t('header.confirm') }}</button>
+      <template v-if="loading">
+        <span class="info">{{ $t('common.loading') }}</span>
+      </template>
+      <template v-else>
+        <span class="stat-add" v-if="cs?.totalAdded">+{{ cs.totalAdded }}</span>
+        <span class="stat-del" v-if="cs?.totalRemoved">-{{ cs.totalRemoved }}</span>
+        <span class="info">{{ cs?.totalFiles ?? 0 }} {{ $t('status.files') }}</span>
+      </template>
     </footer>
 
     <ContextMenu
@@ -164,6 +176,20 @@ async function confirmAll() {
 }
 .filelist.compact .empty {
   padding: 20px 10px;
+}
+.loading {
+  color: var(--muted);
+  text-align: center;
+  padding: 28px 10px;
+  font-size: 13px;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.filelist.compact .loading {
+  padding: 20px 10px;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
 .item {
   display: flex;

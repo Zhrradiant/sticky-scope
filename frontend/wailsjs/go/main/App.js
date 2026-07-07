@@ -50,6 +50,10 @@ export function SpawnStickyNote(arg1) {
   return window['go']['main']['App']['SpawnStickyNote'](arg1);
 }
 
+export function StartAllMonitoring() {
+  return window['go']['main']['App']['StartAllMonitoring']();
+}
+
 export function StickyProjectID() {
   return window['go']['main']['App']['StickyProjectID']();
 }

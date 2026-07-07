@@ -26,6 +26,8 @@ export function SetCompactMode(arg1:boolean):Promise<void>;
 
 export function SpawnStickyNote(arg1:string):Promise<void>;
 
+export function StartAllMonitoring():Promise<void>;
+
 export function StickyProjectID():Promise<string>;
 
 export function UpdateIgnore(arg1:string,arg2:Array<string>,arg3:Array<string>,arg4:boolean):Promise<void>;

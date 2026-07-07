@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { App, model } from '@/api'
+import { App, model, StartAllMonitoring } from '@/api'
 import type { AddProgress } from '@/types'
 
 interface State {
@@ -24,6 +24,11 @@ export const useProjectsStore = defineStore('projects', {
   actions: {
     async load() {
       this.projects = await App.ListProjects()
+      // Kick off background watchers now that the list is rendered. This must
+      // NOT be awaited: StartAllMonitoring launches goroutines per project and
+      // returns immediately, but keeping it fire-and-forget guarantees the UI
+      // never blocks on watcher registration even if the call shape changes.
+      void StartAllMonitoring()
       if (this.activeId && !this.projects.some((p) => p.id === this.activeId)) {
         this.activeId = null
       }

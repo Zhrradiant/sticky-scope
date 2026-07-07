@@ -50,15 +50,38 @@ func New(root string, skipDir func(rel string) bool) (*Watcher, error) {
 // Trigger is the channel that receives a value when a rescan is warranted.
 func (w *Watcher) Trigger() <-chan struct{} { return w.trigger }
 
-// Start registers watches across the tree and begins the event loop.
+// Start launches the event loop and begins watching the tree.
+//
+// To keep startup snappy on large trees, the recursive watch registration
+// (addRecursive) runs in a background goroutine instead of blocking the
+// caller. loop() and addRecursive() are independent goroutines; their start
+// order is not guaranteed and does not need to be — fsnotify buffers events
+// on its Events channel until loop() reads them.
+//
+// NOTE: this watcher is purely event-driven — there is no periodic timer.
+// Because registration happens asynchronously, changes inside directories
+// whose watch has not been registered yet (i.e. registered after the change
+// happened) will NOT produce an fsnotify event and therefore will NOT trigger
+// a rescan, so they can be missed until a later event touches that tree or
+// the user runs a deep rescan. This is an accepted startup trade-off; the
+// overflow path (ErrEventOverflow) does force an immediate rescan to cover
+// dropped events once watches are in place.
 func (w *Watcher) Start() error {
-	w.addRecursive(w.root)
 	go w.loop()
+	go w.addRecursive(w.root)
 	return nil
 }
 
 func (w *Watcher) addRecursive(dir string) {
 	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		// Stop walking once the watcher has been closed, so Close does not leave
+		// a goroutine traversing a large tree for seconds doing useless work
+		// (every AddWith would fail with os.ErrClosed anyway).
+		select {
+		case <-w.done:
+			return fs.SkipDir
+		default:
+		}
 		if err != nil || !d.IsDir() {
 			if err != nil && d != nil && d.IsDir() {
 				return fs.SkipDir

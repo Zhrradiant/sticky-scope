@@ -3,6 +3,11 @@ import { App, model } from '@/api'
 
 interface State {
   changeSets: Record<string, model.ChangeSet>
+  // Project IDs whose ChangeSet is still being fetched for the first time
+  // (awaiting GetChanges or a changes:updated push). Used to show a loading
+  // state instead of a misleading "no changes" message while the background
+  // rescan has not reported back yet.
+  loading: Record<string, boolean>
   selectedPath: string | null
   fileDiff: model.FileDiff | null
   diffLoading: boolean
@@ -12,6 +17,7 @@ interface State {
 export const useChangesStore = defineStore('changes', {
   state: (): State => ({
     changeSets: {},
+    loading: {},
     selectedPath: null,
     fileDiff: null,
     diffLoading: false,
@@ -22,11 +28,23 @@ export const useChangesStore = defineStore('changes', {
       if (!id) return null
       return this.changeSets[id] ?? null
     },
+    // True when the given project's ChangeSet has not arrived yet (first load).
+    isLoading(id: string | null): boolean {
+      if (!id) return false
+      return !!this.loading[id]
+    },
     setChangeSet(cs: model.ChangeSet) {
       this.changeSets[cs.projectId] = cs
+      // A push means the first scan landed — clear the loading flag.
+      this.loading[cs.projectId] = false
     },
     async fetchChanges(id: string) {
-      this.changeSets[id] = await App.GetChanges(id)
+      this.loading[id] = true
+      try {
+        this.changeSets[id] = await App.GetChanges(id)
+      } finally {
+        this.loading[id] = false
+      }
     },
     async selectFile(id: string, path: string) {
       this.selectedPath = path

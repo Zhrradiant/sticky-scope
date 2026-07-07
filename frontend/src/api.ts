@@ -4,11 +4,17 @@ import * as App from '../wailsjs/go/main/App'
 import { model } from '../wailsjs/go/models'
 import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime'
 
-// OpenFileLocation is added here rather than in the auto-generated bindings
-// because it was added to the Go backend after the last wails generate run.
-// The next wails build will regenerate App.d.ts / App.js to include it.
+// Some Go bindings are surfaced through hand-wrappers here (calling into the
+// same Wails runtime registry) rather than via the re-exported `App` namespace
+// below. This is the established place for methods added outside of a
+// `wails generate` run; if a future generate adds one to App.js, the matching
+// wrapper here becomes a harmless duplicate and can be dropped.
 export function OpenFileLocation(id: string, path: string): Promise<void> {
   return (window as any)['go']['main']['App']['OpenFileLocation'](id, path)
+}
+
+export function StartAllMonitoring(): Promise<void> {
+  return (window as any)['go']['main']['App']['StartAllMonitoring']()
 }
 
 export { App, model, EventsOn, EventsOff }

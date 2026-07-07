@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -22,11 +23,12 @@ type App struct {
 	mgr             *manager.Manager
 	mu              sync.Mutex
 	ready           bool
-	stickyProjectID string // project ID loaded via --project-path CLI arg
+	readyCh         chan struct{} // closed once startup finished (mgr set or failed)
+	stickyProjectID string        // project ID loaded via --project-path CLI arg
 }
 
 // NewApp creates the app shell. The manager is built in startup.
-func NewApp() *App { return &App{} }
+func NewApp() *App { return &App{readyCh: make(chan struct{})} }
 
 // emit forwards a manager event to the frontend, but only once the DOM is ready.
 // This avoids the documented EventsEmit/EventsOn data race and dropped events.
@@ -42,6 +44,8 @@ func (a *App) emit(event string, data any) {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	defer close(a.readyCh)
 
 	mgr, err := manager.New(a.emit)
 	if err != nil {
@@ -76,6 +80,24 @@ func (a *App) shutdown(_ context.Context) {
 
 var errNotReady = errors.New("backend not initialised")
 
+// waitForMgr blocks until the manager has finished initialising in startup, or
+// until a timeout elapses. Wails runs OnStartup concurrently with the frontend:
+// the DOM can become ready (and call bound methods like ListProjects) before
+// manager.New has returned for all projects. Without this wait the very first
+// ListProjects call would see a.mgr == nil and return an empty list, causing
+// the UI to flash the "add a project" empty state on cold start. The manager
+// typically becomes ready within tens of milliseconds, so this wait is
+// imperceptible in practice.
+func (a *App) waitForMgr() *manager.Manager {
+	select {
+	case <-a.readyCh:
+	case <-time.After(5 * time.Second):
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.mgr
+}
+
 // ---- bound methods (callable from the frontend) ----
 
 // SelectDirectory opens the native directory picker. Dialogs are unavailable in
@@ -87,17 +109,31 @@ func (a *App) SelectDirectory() (string, error) {
 }
 
 func (a *App) AddProject(path string) (model.ProjectInfo, error) {
-	if a.mgr == nil {
+	mgr := a.waitForMgr()
+	if mgr == nil {
 		return model.ProjectInfo{}, errNotReady
 	}
-	return a.mgr.AddProject(path)
+	return mgr.AddProject(path)
 }
 
 func (a *App) ListProjects() []model.ProjectInfo {
-	if a.mgr == nil {
+	mgr := a.waitForMgr()
+	if mgr == nil {
 		return []model.ProjectInfo{}
 	}
-	return a.mgr.ListProjects()
+	return mgr.ListProjects()
+}
+
+// StartAllMonitoring launches background watchers for every known project.
+// It returns immediately; each watcher registers in its own goroutine. The
+// frontend calls this right after ListProjects so the project list renders
+// instantly instead of waiting for fsnotify registration across large trees.
+func (a *App) StartAllMonitoring() {
+	mgr := a.waitForMgr()
+	if mgr == nil {
+		return
+	}
+	mgr.StartAllMonitoring()
 }
 
 func (a *App) RemoveProject(id string) error {
@@ -108,10 +144,11 @@ func (a *App) RemoveProject(id string) error {
 }
 
 func (a *App) GetChanges(id string) (model.ChangeSet, error) {
-	if a.mgr == nil {
+	mgr := a.waitForMgr()
+	if mgr == nil {
 		return model.ChangeSet{}, errNotReady
 	}
-	return a.mgr.GetChanges(id)
+	return mgr.GetChanges(id)
 }
 
 func (a *App) GetFileDiff(id, path string) (model.FileDiff, error) {
@@ -176,8 +213,13 @@ func (a *App) SetCollapsedMode(collapse bool) {
 // StickyProjectID returns the project ID that was preloaded via --project-path,
 // or an empty string when this is the main (non-sticky) process. The frontend
 // uses this to select the correct project on startup instead of defaulting to
-// the first one in the list.
+// the first one in the list. It waits for startup to finish so that a sticky
+// note process (whose startup runs a full-tree AddProject) does not race the
+// frontend's ListProjects/activeId selection.
 func (a *App) StickyProjectID() string {
+	a.waitForMgr()
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	return a.stickyProjectID
 }
 

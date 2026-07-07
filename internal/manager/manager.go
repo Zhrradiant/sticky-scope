@@ -219,28 +219,38 @@ func (m *Manager) RemoveProject(id string) error {
 }
 
 // ListProjects returns all projects in config order.
-// Also starts monitoring for every loaded project so that the watchers are
-// active immediately on cold restart (monitors are created in New but watchers
-// are not started until the frontend signals readiness via this call).
+//
+// This is a PURE, non-blocking query — it must return immediately so the
+// frontend can render the project list (and the active project) without
+// waiting for watchers to be registered. Watcher startup (which walks the
+// whole tree to register fsnotify watches) is deferred to StartAllMonitoring,
+// which the frontend invokes right after this call returns.
 func (m *Manager) ListProjects() []model.ProjectInfo {
 	m.mu.Lock()
+	defer m.mu.Unlock()
 	out := []model.ProjectInfo{}
-	ids := make([]string, 0, len(m.cfg.Projects))
 	for _, pm := range m.cfg.Projects {
 		if mon, ok := m.monitors[pm.ID]; ok {
 			out = append(out, m.projectInfo(mon))
-			ids = append(ids, pm.ID)
 		}
 	}
-	m.mu.Unlock()
-
-	// Start watchers now that the frontend is ready. Idempotent — no-op for
-	// already-running projects (e.g. sticky-note where AddProject already
-	// started monitoring).
-	for _, id := range ids {
-		_ = m.StartMonitoring(id)
-	}
 	return out
+}
+
+// StartAllMonitoring starts watchers for every known project. Each project's
+// watcher is started in its own goroutine so a slow tree (large repo, network
+// drive) cannot delay the others or the caller. Safe to call repeatedly;
+// StartMonitoring is idempotent per project.
+func (m *Manager) StartAllMonitoring() {
+	m.mu.Lock()
+	ids := make([]string, 0, len(m.monitors))
+	for id := range m.monitors {
+		ids = append(ids, id)
+	}
+	m.mu.Unlock()
+	for _, id := range ids {
+		go func(pid string) { _ = m.StartMonitoring(pid) }(id)
+	}
 }
 
 // ---- monitoring ----
@@ -383,6 +393,15 @@ func (m *Manager) doRescan(mon *monitor) (model.ChangeSet, error) {
 // ---- queries ----
 
 // GetChanges returns the cached summary, computing one if none exists yet.
+//
+// On a cold start (live == nil) it tries to reuse a background rescan that
+// watcher startup may already have running: if mon.scanning is already set it
+// polls for up to ~5 s for that scan to populate the cache, instead of
+// launching a duplicate full-tree scan. There is a startup race —
+// StartMonitoring launches its rescan via `go`, so on a very fast first
+// GetChanges scanning may not yet be set and this method falls back to a
+// synchronous doRescan. If the wait times out it also falls back to a
+// synchronous scan so the UI always gets an answer.
 func (m *Manager) GetChanges(id string) (model.ChangeSet, error) {
 	mon, err := m.getMonitor(id)
 	if err != nil {
@@ -391,9 +410,33 @@ func (m *Manager) GetChanges(id string) (model.ChangeSet, error) {
 	mon.mu.Lock()
 	cur := mon.current
 	hasLive := mon.live != nil
+	scanning := mon.scanning
 	mon.mu.Unlock()
 	if hasLive {
 		return cur, nil
+	}
+	// A background rescan is already running — wait for it to populate the
+	// cache instead of starting a duplicate full-tree scan.
+	if scanning {
+		const waitLimit = 100 // up to ~5s (100 × 50ms)
+		for i := 0; i < waitLimit; i++ {
+			mon.mu.Lock()
+			done := mon.live != nil
+			mon.mu.Unlock()
+			if done {
+				break
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		mon.mu.Lock()
+		cur = mon.current
+		hasLive = mon.live != nil
+		mon.mu.Unlock()
+		if hasLive {
+			return cur, nil
+		}
+		// Background scan did not finish in time — fall through and compute
+		// one synchronously so the UI still gets an answer.
 	}
 	cs, err := m.doRescan(mon)
 	if err != nil {
