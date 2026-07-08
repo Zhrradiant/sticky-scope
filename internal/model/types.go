@@ -14,14 +14,20 @@ const (
 
 // ProjectInfo describes a monitored project (safe to send to the frontend).
 type ProjectInfo struct {
-	ID              string   `json:"id"`
-	Name            string   `json:"name"`
-	Path            string   `json:"path"`
-	CreatedAt       string   `json:"createdAt"`
-	Available       bool     `json:"available"`          // project dir currently exists
-	DefaultPatterns []string `json:"defaultPatterns"`    // pre-written default ignore patterns (gitignore format)
-	Ignore          []string `json:"ignore"`             // extra user ignore patterns
-	UseGitignore    bool     `json:"useGitignore"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Path         string   `json:"path"`
+	CreatedAt    string   `json:"createdAt"`
+	Available    bool     `json:"available"` // project dir currently exists
+	Ignore       []string `json:"ignore"`    // extra user ignore patterns
+	UseGitignore bool     `json:"useGitignore"`
+}
+
+// SettingsInfo is the global, project-independent configuration surfaced to
+// the frontend. It carries the shared default ignore patterns.
+type SettingsInfo struct {
+	Language        string   `json:"language"`
+	DefaultPatterns []string `json:"defaultPatterns"` // global shared default ignore patterns (gitignore format)
 }
 
 // FileChange is one entry in a ChangeSet summary (no line content — counts only).

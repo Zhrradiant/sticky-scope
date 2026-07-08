@@ -51,8 +51,9 @@ export default {
   settings: {
     title: '工具设置',
     useGitignore: '自动解析项目的 .gitignore',
-    defaultPatterns: '默认忽略规则（每行一条，gitignore 语法）',
-    defaultPlaceholder: '# 预设规则，启动即生效，可自由编辑',
+    defaultPatterns: '默认忽略规则（全局共享 · 每行一条 · gitignore 语法）',
+    defaultPlaceholder: '# 全局共享，对所有项目生效，可自由编辑',
+    resetDefaults: '还原为默认',
     extraPatterns: '额外忽略规则（每行一条，gitignore 语法）',
     extraPlaceholder: '*.log\ntmp/\nsecret.key',
     needProject: '请先选择一个项目',

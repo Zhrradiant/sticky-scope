@@ -51,8 +51,9 @@ export default {
   settings: {
     title: 'Settings',
     useGitignore: "Auto-parse the project's .gitignore",
-    defaultPatterns: 'Default ignore patterns (one per line, gitignore syntax, editable)',
-    defaultPlaceholder: '# Preset patterns — freely editable',
+    defaultPatterns: 'Default ignore patterns (global · shared · one per line · gitignore syntax)',
+    defaultPlaceholder: '# Global, shared across all projects — freely editable',
+    resetDefaults: 'Reset to defaults',
     extraPatterns: 'Extra ignore patterns (one per line, gitignore syntax)',
     extraPlaceholder: '*.log\ntmp/\nsecret.key',
     needProject: 'Please select a project first',

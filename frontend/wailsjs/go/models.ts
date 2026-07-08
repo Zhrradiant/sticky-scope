@@ -180,7 +180,6 @@ export namespace model {
 	    path: string;
 	    createdAt: string;
 	    available: boolean;
-	    defaultPatterns: string[];
 	    ignore: string[];
 	    useGitignore: boolean;
 	
@@ -195,9 +194,22 @@ export namespace model {
 	        this.path = source["path"];
 	        this.createdAt = source["createdAt"];
 	        this.available = source["available"];
-	        this.defaultPatterns = source["defaultPatterns"];
 	        this.ignore = source["ignore"];
 	        this.useGitignore = source["useGitignore"];
+	    }
+	}
+	export class SettingsInfo {
+	    language: string;
+	    defaultPatterns: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SettingsInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.language = source["language"];
+	        this.defaultPatterns = source["defaultPatterns"];
 	    }
 	}
 

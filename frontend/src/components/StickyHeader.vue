@@ -139,7 +139,7 @@ function onMoreDeepRescan() {
 
 function onMoreSettings() {
   moreOpen.value = false
-  settOpen.value = true
+  openSettings()
 }
 
 function onMoreExpand() {
@@ -157,13 +157,41 @@ const defaultPatterns = ref('')
 const showDefaultPatterns = ref(false)
 const locale = ref<Lang>(currentLocale())
 
-watch(() => active.value, (p) => {
+// Load the global shared default patterns from the backend into the textarea.
+async function loadDefaultPatterns() {
+  try {
+    const s = await App.GetSettings()
+    defaultPatterns.value = (s.defaultPatterns ?? []).join('\n')
+  } catch {
+    defaultPatterns.value = ''
+  }
+}
+
+// Load every field in the settings panel from current source-of-truth. Called
+// on every open so the panel always reflects the latest persisted state
+// (after a save, a reset, or a project switch) instead of a stale snapshot.
+async function syncSettingsState() {
+  const p = active.value
   if (p) {
     useGitignore.value = p.useGitignore
-    defaultPatterns.value = (p.defaultPatterns ?? []).join('\n')
     extraPatterns.value = (p.ignore ?? []).join('\n')
   }
-}, { immediate: true })
+  await loadDefaultPatterns()
+}
+
+watch(() => active.value, () => {
+  // If the panel is open while the active project changes, refresh the
+  // per-project fields live so the user never sees stale content.
+  if (settOpen.value && active.value) {
+    useGitignore.value = active.value.useGitignore
+    extraPatterns.value = (active.value.ignore ?? []).join('\n')
+  }
+})
+
+function openSettings() {
+  settOpen.value = true
+  void syncSettingsState()
+}
 
 async function applySettings() {
   const id = projects.activeId
@@ -171,10 +199,24 @@ async function applySettings() {
     needProjectAlert.value = true
     return
   }
-  const defs = defaultPatterns.value.split('\n').map(s => s.trim()).filter(s => s.length > 0)
   const extras = extraPatterns.value.split('\n').map(s => s.trim()).filter(s => s.length > 0)
-  await projects.updateIgnore(id, defs, extras, useGitignore.value)
+  const defs = defaultPatterns.value.split('\n').map(s => s.trim()).filter(s => s.length > 0)
+  // Persist per-project extra patterns and the global shared defaults together.
+  await projects.updateIgnore(id, extras, useGitignore.value)
+  await App.UpdateDefaultPatterns(defs)
   settOpen.value = false
+}
+
+// Restore the global shared default patterns to the factory preset and refresh
+// the textarea immediately so the new content is visible without reopening.
+async function resetDefaultPatterns() {
+  try {
+    await App.ResetDefaultPatterns()
+  } finally {
+    // Always reload from the backend so the textarea converges to the truth,
+    // whether the reset succeeded or threw.
+    await loadDefaultPatterns()
+  }
 }
 
 function switchLocale(l: Lang) {
@@ -251,7 +293,7 @@ function switchLocale(l: Lang) {
       <template v-if="isExpanded && !isCollapsed">
         <button class="sm ghost expand-btn" @click="toggleExpand" :title="$t('header.collapse')">↙</button>
         <button class="sm ghost icon-btn" :disabled="busy || !active" @click="doDeepRescan" :title="$t('header.deepRescan')">⟳</button>
-        <button ref="settBtnRef" class="sm ghost icon-btn" @click.stop="settOpen = !settOpen" :title="$t('header.settings')">⚙</button>
+        <button ref="settBtnRef" class="sm ghost icon-btn" @click.stop="settOpen ? (settOpen = false) : openSettings()" :title="$t('header.settings')">⚙</button>
       </template>
 
       <!-- Compact mode: "···" overflow menu -->
@@ -301,6 +343,7 @@ function switchLocale(l: Lang) {
       <p class="lbl toggle-lbl" @click="showDefaultPatterns = !showDefaultPatterns">
         <span class="toggle-arrow" :class="{ open: showDefaultPatterns }">▸</span>
         {{ $t('settings.defaultPatterns') }}
+        <button class="sm ghost icon-btn reset-defaults-btn" @click.stop="resetDefaultPatterns" :title="$t('settings.resetDefaults')" :aria-label="$t('settings.resetDefaults')">⟲</button>
       </p>
       <textarea v-if="showDefaultPatterns" v-model="defaultPatterns" rows="5" :placeholder="$t('settings.defaultPlaceholder')"></textarea>
       <div class="sett-actions">
@@ -471,8 +514,10 @@ textarea:focus { border-color: var(--accent); }
   border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer;
 }
 .lang-btn.active { background: var(--accent); color: #FFF; border-color: var(--accent); }
-.toggle-lbl { cursor: pointer; user-select: none; }
+.toggle-lbl { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 4px; }
 .toggle-lbl:hover { color: var(--accent); }
 .toggle-arrow { display: inline-block; font-size: 10px; width: 12px; transition: transform 0.15s; }
 .toggle-arrow.open { transform: rotate(90deg); }
+.reset-defaults-btn { margin-left: auto; font-size: 15px; line-height: 1; padding: 2px 6px; }
+.reset-defaults-btn:hover { color: var(--accent); }
 </style>

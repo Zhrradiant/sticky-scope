@@ -145,13 +145,12 @@ func (m *Manager) AddProject(path string) (model.ProjectInfo, error) {
 	}
 
 	pm := config.ProjectMeta{
-		ID:              id,
-		Name:            filepath.Base(abs),
-		Path:            abs,
-		CreatedAt:       time.Now().Format(time.RFC3339),
-		DefaultPatterns: config.DefaultPreset(),
-		Ignore:          []string{},
-		UseGitignore:    true,
+		ID:           id,
+		Name:         filepath.Base(abs),
+		Path:         abs,
+		CreatedAt:    time.Now().Format(time.RFC3339),
+		Ignore:       []string{},
+		UseGitignore: true,
 	}
 	mon, err = m.newMonitor(pm)
 	if err != nil {
@@ -159,11 +158,11 @@ func (m *Manager) AddProject(path string) (model.ProjectInfo, error) {
 	}
 
 	// Phase 1: quick count → frontend shows progress bar
-	total := scanner.CountFiles(abs, scanOpts(pm))
+	total := scanner.CountFiles(abs, scanOpts(pm, m.defaultPatterns()))
 	m.emit(EventAddProg, model.AddProgress{Message: "scanning", Current: 0, Total: total})
 
 	// Phase 2: full scan with progress
-	live, err := scanner.ScanWithProgress(abs, scanOpts(pm), mon.hc,
+	live, err := scanner.ScanWithProgress(abs, scanOpts(pm, m.defaultPatterns()), mon.hc,
 		func(cur, _ int) {
 			m.emit(EventAddProg, model.AddProgress{Message: "scanning", Current: cur, Total: total})
 		})
@@ -270,7 +269,7 @@ func (m *Manager) StartMonitoring(id string) error {
 		mon.mu.Unlock()
 		return fmt.Errorf("project directory unavailable")
 	}
-	w, err := watcher.New(mon.meta.Path, buildSkipDir(mon.meta.DefaultPatterns, mon.meta.Ignore))
+	w, err := watcher.New(mon.meta.Path, buildSkipDir(m.defaultPatterns(), mon.meta.Ignore))
 	if err != nil {
 		mon.mu.Unlock()
 		return err
@@ -378,7 +377,7 @@ func (m *Manager) doRescan(mon *monitor) (model.ChangeSet, error) {
 	if !dirExists(meta.Path) {
 		return model.ChangeSet{}, fmt.Errorf("unavailable")
 	}
-	live, err := scanner.Scan(meta.Path, scanOpts(meta), hc)
+	live, err := scanner.Scan(meta.Path, scanOpts(meta, m.defaultPatterns()), hc)
 	if err != nil {
 		return model.ChangeSet{}, err
 	}
@@ -552,14 +551,14 @@ func (m *Manager) DeleteVersion(id, vid string) error {
 	return nil
 }
 
-// UpdateIgnore changes a project's ignore configuration and rescans.
-func (m *Manager) UpdateIgnore(id string, defaultPatterns []string, extraPatterns []string, useGitignore bool) error {
+// UpdateIgnore changes a project's extra ignore configuration and rescans.
+// (The shared default patterns are edited separately via UpdateDefaultPatterns.)
+func (m *Manager) UpdateIgnore(id string, extraPatterns []string, useGitignore bool) error {
 	mon, err := m.getMonitor(id)
 	if err != nil {
 		return err
 	}
 	mon.mu.Lock()
-	mon.meta.DefaultPatterns = defaultPatterns
 	mon.meta.Ignore = extraPatterns
 	mon.meta.UseGitignore = useGitignore
 	mon.mu.Unlock()
@@ -567,7 +566,6 @@ func (m *Manager) UpdateIgnore(id string, defaultPatterns []string, extraPattern
 	m.mu.Lock()
 	for i := range m.cfg.Projects {
 		if m.cfg.Projects[i].ID == id {
-			m.cfg.Projects[i].DefaultPatterns = defaultPatterns
 			m.cfg.Projects[i].Ignore = extraPatterns
 			m.cfg.Projects[i].UseGitignore = useGitignore
 		}
@@ -667,21 +665,20 @@ func (m *Manager) scanLive(mon *monitor) (*store.Manifest, error) {
 	meta := mon.meta
 	hc := mon.hc
 	mon.mu.Unlock()
-	return scanner.Scan(meta.Path, scanOpts(meta), hc)
+	return scanner.Scan(meta.Path, scanOpts(meta, m.defaultPatterns()), hc)
 }
 
 func (m *Manager) projectInfo(mon *monitor) model.ProjectInfo {
 	mon.mu.Lock()
 	defer mon.mu.Unlock()
 	return model.ProjectInfo{
-		ID:              mon.meta.ID,
-		Name:            mon.meta.Name,
-		Path:            mon.meta.Path,
-		CreatedAt:       mon.meta.CreatedAt,
-		Available:       dirExists(mon.meta.Path),
-		DefaultPatterns: mon.meta.DefaultPatterns,
-		Ignore:          mon.meta.Ignore,
-		UseGitignore:    mon.meta.UseGitignore,
+		ID:           mon.meta.ID,
+		Name:         mon.meta.Name,
+		Path:         mon.meta.Path,
+		CreatedAt:    mon.meta.CreatedAt,
+		Available:    dirExists(mon.meta.Path),
+		Ignore:       mon.meta.Ignore,
+		UseGitignore: mon.meta.UseGitignore,
 	}
 }
 
@@ -696,11 +693,11 @@ func (m *Manager) validatePath(abs string) error {
 	return nil
 }
 
-func scanOpts(pm config.ProjectMeta) scanner.Options {
+func scanOpts(pm config.ProjectMeta, defaultPatterns []string) scanner.Options {
 	// Merge default + extra patterns. Defaults go first so extra patterns can
 	// override them (later patterns have higher priority in gitignore semantics).
-	merged := make([]string, 0, len(pm.DefaultPatterns)+len(pm.Ignore))
-	merged = append(merged, pm.DefaultPatterns...)
+	merged := make([]string, 0, len(defaultPatterns)+len(pm.Ignore))
+	merged = append(merged, defaultPatterns...)
 	merged = append(merged, pm.Ignore...)
 	return scanner.Options{Patterns: merged, UseGitignore: pm.UseGitignore}
 }
@@ -751,4 +748,78 @@ func buildSkipDir(defaultPatterns, extraPatterns []string) func(rel string) bool
 		}
 		return false
 	}
+}
+
+// defaultPatterns returns the global shared default ignore patterns (a defensive
+// copy). Safe for concurrent use.
+func (m *Manager) defaultPatterns() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]string, len(m.cfg.Settings.DefaultPatterns))
+	copy(out, m.cfg.Settings.DefaultPatterns)
+	return out
+}
+
+// Settings returns the global settings surfaced to the frontend.
+func (m *Manager) Settings() model.SettingsInfo {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	dp := make([]string, len(m.cfg.Settings.DefaultPatterns))
+	copy(dp, m.cfg.Settings.DefaultPatterns)
+	return model.SettingsInfo{
+		Language:        m.cfg.Settings.Language,
+		DefaultPatterns: dp,
+	}
+}
+
+// UpdateDefaultPatterns replaces the global shared default ignore patterns and
+// rescan every monitored project so the change takes effect everywhere at once.
+// The config is persisted synchronously (so the caller can immediately read back
+// the new value); the per-project rescans run in the background so this method
+// returns instantly and the UI can refresh without waiting on a full rewalk.
+func (m *Manager) UpdateDefaultPatterns(patterns []string) error {
+	m.mu.Lock()
+	m.cfg.Settings.DefaultPatterns = patterns
+	saveErr := config.Save(m.cfg)
+	ids := make([]string, 0, len(m.monitors))
+	for id := range m.monitors {
+		ids = append(ids, id)
+	}
+	m.mu.Unlock()
+
+	// Restart watchers and rescan in the background. rescanAndEmit emits a
+	// change event when done, so the frontend converges to the new state
+	// without the caller having to block on the rewalk.
+	go m.applyDefaultsToProjects(ids)
+	return saveErr
+}
+
+// applyDefaultsToProjects restarts the watcher (so its skipDir predicate picks
+// up the new patterns) and triggers a rescan for each given project. Intended
+// to run in its own goroutine after default patterns change.
+func (m *Manager) applyDefaultsToProjects(ids []string) {
+	for _, id := range ids {
+		mon, err := m.getMonitor(id)
+		if err != nil {
+			continue
+		}
+		mon.hc.Clear()
+		// Restart watcher so the skipDir predicate picks up the new patterns;
+		// otherwise directories removed from the defaults would stay unwatched
+		// until a deep rescan.
+		m.stopMonitor(mon)
+		// StartMonitoring returns an error if the project was removed between
+		// the ids snapshot and now; skip the rescan in that case to avoid a
+		// pointless failed scan of a deleted project.
+		if err := m.StartMonitoring(id); err != nil {
+			continue
+		}
+		m.rescanAndEmit(mon)
+	}
+}
+
+// ResetDefaultPatterns restores the global shared default ignore patterns to the
+// factory preset (config.DefaultPreset) and rescan every monitored project.
+func (m *Manager) ResetDefaultPatterns() error {
+	return m.UpdateDefaultPatterns(config.DefaultPreset())
 }

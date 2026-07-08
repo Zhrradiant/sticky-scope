@@ -172,11 +172,38 @@ func (a *App) ConfirmAll(id string) error {
 	return a.mgr.ConfirmAll(id)
 }
 
-func (a *App) UpdateIgnore(id string, defaultPatterns []string, extraPatterns []string, useGitignore bool) error {
+func (a *App) UpdateIgnore(id string, extraPatterns []string, useGitignore bool) error {
 	if a.mgr == nil {
 		return errNotReady
 	}
-	return a.mgr.UpdateIgnore(id, defaultPatterns, extraPatterns, useGitignore)
+	return a.mgr.UpdateIgnore(id, extraPatterns, useGitignore)
+}
+
+// GetSettings returns the global, project-independent settings (including the
+// shared default ignore patterns).
+func (a *App) GetSettings() (model.SettingsInfo, error) {
+	if a.mgr == nil {
+		return model.SettingsInfo{}, errNotReady
+	}
+	return a.mgr.Settings(), nil
+}
+
+// UpdateDefaultPatterns replaces the global shared default ignore patterns and
+// rescan every monitored project.
+func (a *App) UpdateDefaultPatterns(patterns []string) error {
+	if a.mgr == nil {
+		return errNotReady
+	}
+	return a.mgr.UpdateDefaultPatterns(patterns)
+}
+
+// ResetDefaultPatterns restores the global shared default ignore patterns to the
+// factory preset and rescan every monitored project.
+func (a *App) ResetDefaultPatterns() error {
+	if a.mgr == nil {
+		return errNotReady
+	}
+	return a.mgr.ResetDefaultPatterns()
 }
 
 // SetCompactMode toggles between compact note (330×480) and expanded (1100×680).

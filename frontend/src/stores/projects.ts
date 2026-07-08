@@ -74,8 +74,8 @@ export const useProjectsStore = defineStore('projects', {
       if (this.activeId === id) this.activeId = null
       await this.load()
     },
-    async updateIgnore(id: string, defaultPatterns: string[], extraPatterns: string[], useGitignore: boolean) {
-      await App.UpdateIgnore(id, defaultPatterns, extraPatterns, useGitignore)
+    async updateIgnore(id: string, extraPatterns: string[], useGitignore: boolean) {
+      await App.UpdateIgnore(id, extraPatterns, useGitignore)
       await this.load()
     },
   },

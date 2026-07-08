@@ -25,18 +25,18 @@ const ProjectDirName = ".sticky-scope"
 
 // ProjectMeta is the persisted description of a monitored project.
 type ProjectMeta struct {
-	ID              string   `json:"id"`
-	Name            string   `json:"name"`
-	Path            string   `json:"path"`
-	CreatedAt       string   `json:"createdAt"`
-	DefaultPatterns []string `json:"defaultPatterns"` // pre-written default ignore patterns (gitignore format)
-	Ignore          []string `json:"ignore"`          // extra user ignore patterns
-	UseGitignore    bool     `json:"useGitignore"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Path         string   `json:"path"`
+	CreatedAt    string   `json:"createdAt"`
+	Ignore       []string `json:"ignore"`       // extra user ignore patterns
+	UseGitignore bool     `json:"useGitignore"`
 }
 
 // Settings holds global, project-independent preferences.
 type Settings struct {
-	Language string `json:"language"` // "zh" | "en"; UI also persists this itself
+	Language        string   `json:"language"`        // "zh" | "en"; UI also persists this itself
+	DefaultPatterns []string `json:"defaultPatterns"` // global shared default ignore patterns (gitignore format)
 }
 
 // Config is the root document persisted to config.json.
@@ -68,7 +68,8 @@ func VersionIndexFile(projectRoot string) string {
 }
 
 // Load reads config.json, returning an empty config if it does not exist yet.
-// It also backfills DefaultPatterns for projects created before this field existed.
+// It also collapses legacy per-project DefaultPatterns into the single shared
+// global Settings.DefaultPatterns (a one-time migration).
 func Load() (*Config, error) {
 	root, err := Root()
 	if err != nil {
@@ -88,13 +89,53 @@ func Load() (*Config, error) {
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, err
 	}
-	// Migration: backfill default patterns for older projects.
-	for i := range c.Projects {
-		if len(c.Projects[i].DefaultPatterns) == 0 {
-			c.Projects[i].DefaultPatterns = DefaultPreset()
+	// Migration: collapse legacy per-project DefaultPatterns into the new
+	// single global list. The field no longer exists on ProjectMeta, so read
+	// it from the raw JSON; merge (order-preserving, deduped) into
+	// Settings.DefaultPatterns so existing edits are preserved.
+	var raw struct {
+		Projects []struct {
+			DefaultPatterns []string `json:"defaultPatterns"`
+		} `json:"projects"`
+	}
+	_ = json.Unmarshal(data, &raw) // best-effort; shape mismatch is fine
+	legacy := []string{}
+	for _, p := range raw.Projects {
+		legacy = mergePatterns(legacy, p.DefaultPatterns)
+	}
+	// If the global defaults are already set (from settings.defaultPatterns in
+	// the JSON), keep them as the single source of truth. Otherwise seed them
+	// from the merged legacy per-project patterns, falling back to the factory
+	// preset for a fresh install.
+	if len(c.Settings.DefaultPatterns) == 0 {
+		if len(legacy) > 0 {
+			c.Settings.DefaultPatterns = legacy
+		} else {
+			c.Settings.DefaultPatterns = DefaultPreset()
 		}
 	}
 	return &c, nil
+}
+
+// mergePatterns appends items from src to dst, skipping exact duplicates that
+// already appear in dst (case-sensitive). Order is preserved.
+func mergePatterns(dst, src []string) []string {
+	seen := make(map[string]struct{}, len(dst))
+	for _, p := range dst {
+		seen[strings.TrimSpace(p)] = struct{}{}
+	}
+	for _, p := range src {
+		k := strings.TrimSpace(p)
+		if k == "" {
+			continue
+		}
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = struct{}{}
+		dst = append(dst, p)
+	}
+	return dst
 }
 
 // Save writes config.json atomically.
@@ -122,8 +163,9 @@ func ProjectID(absPath string) string {
 }
 
 // DefaultPreset returns the pre-written default ignore patterns in gitignore
-// format. These are pre-populated into every new project's DefaultPatterns and
-// are fully visible and editable in the settings panel.
+// format. These back the global shared Settings.DefaultPatterns and are fully
+// visible and editable in the settings panel; the "reset to default" action
+// restores them.
 func DefaultPreset() []string {
 	return []string{
 		// VCS

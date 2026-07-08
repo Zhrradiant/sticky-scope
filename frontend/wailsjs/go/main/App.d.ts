@@ -12,11 +12,15 @@ export function GetChanges(arg1:string):Promise<model.ChangeSet>;
 
 export function GetFileDiff(arg1:string,arg2:string):Promise<model.FileDiff>;
 
+export function GetSettings():Promise<model.SettingsInfo>;
+
 export function ListProjects():Promise<Array<model.ProjectInfo>>;
 
 export function OpenFileLocation(arg1:string,arg2:string):Promise<void>;
 
 export function RemoveProject(arg1:string):Promise<void>;
+
+export function ResetDefaultPatterns():Promise<void>;
 
 export function SelectDirectory():Promise<string>;
 
@@ -30,4 +34,6 @@ export function StartAllMonitoring():Promise<void>;
 
 export function StickyProjectID():Promise<string>;
 
-export function UpdateIgnore(arg1:string,arg2:Array<string>,arg3:Array<string>,arg4:boolean):Promise<void>;
+export function UpdateDefaultPatterns(arg1:Array<string>):Promise<void>;
+
+export function UpdateIgnore(arg1:string,arg2:Array<string>,arg3:boolean):Promise<void>;

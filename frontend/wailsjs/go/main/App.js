@@ -22,6 +22,10 @@ export function GetFileDiff(arg1, arg2) {
   return window['go']['main']['App']['GetFileDiff'](arg1, arg2);
 }
 
+export function GetSettings() {
+  return window['go']['main']['App']['GetSettings']();
+}
+
 export function ListProjects() {
   return window['go']['main']['App']['ListProjects']();
 }
@@ -32,6 +36,10 @@ export function OpenFileLocation(arg1, arg2) {
 
 export function RemoveProject(arg1) {
   return window['go']['main']['App']['RemoveProject'](arg1);
+}
+
+export function ResetDefaultPatterns() {
+  return window['go']['main']['App']['ResetDefaultPatterns']();
 }
 
 export function SelectDirectory() {
@@ -58,6 +66,10 @@ export function StickyProjectID() {
   return window['go']['main']['App']['StickyProjectID']();
 }
 
-export function UpdateIgnore(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['UpdateIgnore'](arg1, arg2, arg3, arg4);
+export function UpdateDefaultPatterns(arg1) {
+  return window['go']['main']['App']['UpdateDefaultPatterns'](arg1);
+}
+
+export function UpdateIgnore(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateIgnore'](arg1, arg2, arg3);
 }
