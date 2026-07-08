@@ -227,9 +227,9 @@ func (a *App) SetCompactMode(expand bool) {
 // or unlocks it so the normal compact/expanded sizing takes over again.
 func (a *App) SetCollapsedMode(collapse bool) {
 	if collapse {
-		runtime.WindowSetMinSize(a.ctx, 183, 78)
-		runtime.WindowSetMaxSize(a.ctx, 183, 78)
-		runtime.WindowSetSize(a.ctx, 183, 78)
+		runtime.WindowSetMinSize(a.ctx, 220, 78)
+		runtime.WindowSetMaxSize(a.ctx, 220, 78)
+		runtime.WindowSetSize(a.ctx, 220, 78)
 	} else {
 		// Remove the max-size clamp so resize is allowed again.
 		// A zero max means "no constraint" in Wails/WebView2.

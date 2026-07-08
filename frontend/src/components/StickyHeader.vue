@@ -226,7 +226,7 @@ function switchLocale(l: Lang) {
 </script>
 
 <template>
-  <header class="sticky-header drag-region">
+  <header class="sticky-header drag-region" :class="{ collapsed: isCollapsed }">
     <div class="left-group no-drag">
       <!-- Collapse toggle -->
       <button
@@ -240,7 +240,7 @@ function switchLocale(l: Lang) {
 
       <!-- Project dropdown -->
       <div ref="projRef" class="proj-drop">
-        <button class="proj-btn" @click="isCollapsed ? null : toggleDropdown()" :disabled="!list.length || isCollapsed">
+        <button class="proj-btn" @click="isCollapsed ? null : toggleDropdown()" :disabled="!list.length">
           <span class="proj-name">{{ projDisplayName }}</span>
           <span class="arrow">▾</span>
         </button>
@@ -391,6 +391,11 @@ function switchLocale(l: Lang) {
   display: flex;
   align-items: center;
   gap: 2px;
+}
+/* Collapsed mode: the actions group is empty, so center the left-group
+   (collapse toggle + project button) horizontally inside the wider tray window. */
+.sticky-header.collapsed {
+  justify-content: center;
 }
 .collapse-btn {
   display: flex;
